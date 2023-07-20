@@ -58,6 +58,8 @@ int main(int argc, char *argv[])
 {
     SingleApplication app(argc, argv);
 
+    app.doSingleInstanceTest(false);
+
     Calculator calc;
 
     QObject::connect( &app, &SingleApplication::instanceStarted, [ &calc ]() {

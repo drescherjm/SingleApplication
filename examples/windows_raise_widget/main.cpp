@@ -12,7 +12,9 @@ void raiseWidget(QWidget* widget);
 int main(int argc, char *argv[]) {
 
 #ifdef Q_OS_WINDOWS
-    SingleApplication app(argc, argv, true);
+    SingleApplication app(argc, argv);
+
+    app.doSingleInstanceTest(true);
 
     if (app.isSecondary()) {
 

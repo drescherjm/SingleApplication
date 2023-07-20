@@ -37,136 +37,147 @@
  * @param options Optional flags to toggle specific behaviour
  * @param timeout Maximum time blocking functions are allowed during app load
  */
-SingleApplication::SingleApplication( int &argc, char *argv[], bool allowSecondary, Options options, int timeout, const QString &userData )
+SingleApplication::SingleApplication( int &argc, char *argv[] )
     : app_t( argc, argv ), d_ptr( new SingleApplicationPrivate( this ) )
 {
-    Q_D( SingleApplication );
 
-#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
-    // On Android and iOS since the library is not supported fallback to
-    // standard QApplication behaviour by simply returning at this point.
-    qWarning() << "SingleApplication is not supported on Android and iOS systems.";
-    return;
-#endif
-
-    // Store the current mode of the program
-    d->options = options;
-
-    // Add any unique user data
-    if ( ! userData.isEmpty() )
-        d->addAppData( userData );
-
-    // Generating an application ID used for identifying the shared memory
-    // block and QLocalServer
-    d->genBlockServerName();
-
-    // To mitigate QSharedMemory issues with large amount of processes
-    // attempting to attach at the same time
-    SingleApplicationPrivate::randomSleep();
-
-#ifdef Q_OS_UNIX
-    // By explicitly attaching it and then deleting it we make sure that the
-    // memory is deleted even after the process has crashed on Unix.
-    d->memory = new QSharedMemory( d->blockServerName );
-    d->memory->attach();
-    delete d->memory;
-#endif
-    // Guarantee thread safe behaviour with a shared memory block.
-    d->memory = new QSharedMemory( d->blockServerName );
-
-    // Create a shared memory block
-    if( d->memory->create( sizeof( InstancesInfo ) )){
-        // Initialize the shared memory block
-        if( ! d->memory->lock() ){
-          qCritical() << "SingleApplication: Unable to lock memory block after create.";
-          abortSafely();
-        }
-        d->initializeMemoryBlock();
-    } else {
-        if( d->memory->error() == QSharedMemory::AlreadyExists ){
-          // Attempt to attach to the memory segment
-          if( ! d->memory->attach() ){
-              qCritical() << "SingleApplication: Unable to attach to shared memory block.";
-              abortSafely();
-          }
-          if( ! d->memory->lock() ){
-            qCritical() << "SingleApplication: Unable to lock memory block after attach.";
-            abortSafely();
-          }
-        } else {
-          qCritical() << "SingleApplication: Unable to create block.";
-          abortSafely();
-        }
-    }
-
-    auto *inst = static_cast<InstancesInfo*>( d->memory->data() );
-    QElapsedTimer time;
-    time.start();
-
-    // Make sure the shared memory block is initialised and in consistent state
-    while( true ){
-      // If the shared memory block's checksum is valid continue
-      if( d->blockChecksum() == inst->checksum ) break;
-
-      // If more than 5s have elapsed, assume the primary instance crashed and
-      // assume it's position
-      if( time.elapsed() > 5000 ){
-          qWarning() << "SingleApplication: Shared memory block has been in an inconsistent state from more than 5s. Assuming primary instance failure.";
-          d->initializeMemoryBlock();
-      }
-
-      // Otherwise wait for a random period and try again. The random sleep here
-      // limits the probability of a collision between two racing apps and
-      // allows the app to initialise faster
-      if( ! d->memory->unlock() ){
-        qDebug() << "SingleApplication: Unable to unlock memory for random wait.";
-        qDebug() << d->memory->errorString();
-      }
-      SingleApplicationPrivate::randomSleep();
-      if( ! d->memory->lock() ){
-        qCritical() << "SingleApplication: Unable to lock memory after random wait.";
-        abortSafely();
-      }
-    }
-
-    if( inst->primary == false ){
-        d->startPrimary();
-        if( ! d->memory->unlock() ){
-          qDebug() << "SingleApplication: Unable to unlock memory after primary start.";
-          qDebug() << d->memory->errorString();
-        }
-        return;
-    }
-
-    // Check if another instance can be started
-    if( allowSecondary ){
-        d->startSecondary();
-        if( d->options & Mode::SecondaryNotification ){
-            d->connectToPrimary( timeout, SingleApplicationPrivate::SecondaryInstance );
-        }
-        if( ! d->memory->unlock() ){
-          qDebug() << "SingleApplication: Unable to unlock memory after secondary start.";
-          qDebug() << d->memory->errorString();
-        }
-        return;
-    }
-
-    if( ! d->memory->unlock() ){
-      qDebug() << "SingleApplication: Unable to unlock memory at end of execution.";
-      qDebug() << d->memory->errorString();
-    }
-
-    d->connectToPrimary( timeout, SingleApplicationPrivate::NewInstance );
-
-    delete d;
-
-    ::exit( EXIT_SUCCESS );
 }
 
 SingleApplication::~SingleApplication()
 {
     Q_D( SingleApplication );
     delete d;
+}
+
+void SingleApplication::doSingleInstanceTest(bool allowSecondary, Options options, int timeout, const QString& userData)
+{
+	Q_D(SingleApplication);
+
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+	// On Android and iOS since the library is not supported fallback to
+	// standard QApplication behaviour by simply returning at this point.
+	qWarning() << "SingleApplication is not supported on Android and iOS systems.";
+	return;
+#endif
+
+	// Store the current mode of the program
+	d->options = options;
+
+	// Generating an application ID used for identifying the shared memory
+	// block and QLocalServer
+	d->genBlockServerName();
+
+	// To mitigate QSharedMemory issues with large amount of processes
+	// attempting to attach at the same time
+	SingleApplicationPrivate::randomSleep();
+
+#ifdef Q_OS_UNIX
+	// By explicitly attaching it and then deleting it we make sure that the
+	// memory is deleted even after the process has crashed on Unix.
+	d->memory = new QSharedMemory(d->blockServerName);
+	d->memory->attach();
+	delete d->memory;
+#endif
+	// Guarantee thread safe behaviour with a shared memory block.
+	d->memory = new QSharedMemory(d->blockServerName);
+
+	// Create a shared memory block
+	if (d->memory->create(sizeof(InstancesInfo))) {
+		// Initialize the shared memory block
+		if (!d->memory->lock()) {
+			qCritical() << "SingleApplication: Unable to lock memory block after create.";
+			abortSafely();
+		}
+		d->initializeMemoryBlock();
+	}
+	else {
+		if (d->memory->error() == QSharedMemory::AlreadyExists) {
+			// Attempt to attach to the memory segment
+			if (!d->memory->attach()) {
+				qCritical() << "SingleApplication: Unable to attach to shared memory block.";
+				abortSafely();
+			}
+			if (!d->memory->lock()) {
+				qCritical() << "SingleApplication: Unable to lock memory block after attach.";
+				abortSafely();
+			}
+		}
+		else {
+			qCritical() << "SingleApplication: Unable to create block.";
+			abortSafely();
+		}
+	}
+
+	auto* inst = static_cast<InstancesInfo*>(d->memory->data());
+	QElapsedTimer time;
+	time.start();
+
+	// Make sure the shared memory block is initialised and in consistent state
+	while (true) {
+		// If the shared memory block's checksum is valid continue
+		if (d->blockChecksum() == inst->checksum) break;
+
+		// If more than 5s have elapsed, assume the primary instance crashed and
+		// assume it's position
+		if (time.elapsed() > 5000) {
+			qWarning() << "SingleApplication: Shared memory block has been in an inconsistent state from more than 5s. Assuming primary instance failure.";
+			d->initializeMemoryBlock();
+		}
+
+		// Otherwise wait for a random period and try again. The random sleep here
+		// limits the probability of a collision between two racing apps and
+		// allows the app to initialise faster
+		if (!d->memory->unlock()) {
+			qDebug() << "SingleApplication: Unable to unlock memory for random wait.";
+			qDebug() << d->memory->errorString();
+		}
+		SingleApplicationPrivate::randomSleep();
+		if (!d->memory->lock()) {
+			qCritical() << "SingleApplication: Unable to lock memory after random wait.";
+			abortSafely();
+		}
+	}
+
+	if (inst->primary == false) {
+		d->startPrimary();
+		if (!d->memory->unlock()) {
+			qDebug() << "SingleApplication: Unable to unlock memory after primary start.";
+			qDebug() << d->memory->errorString();
+		}
+		return;
+	}
+
+	// Check if another instance can be started
+	if (allowSecondary) {
+		d->startSecondary();
+		if (d->options & Mode::SecondaryNotification) {
+			d->connectToPrimary(timeout, SingleApplicationPrivate::SecondaryInstance);
+		}
+		if (!d->memory->unlock()) {
+			qDebug() << "SingleApplication: Unable to unlock memory after secondary start.";
+			qDebug() << d->memory->errorString();
+		}
+		return;
+	}
+
+	if (!d->memory->unlock()) {
+		qDebug() << "SingleApplication: Unable to unlock memory at end of execution.";
+		qDebug() << d->memory->errorString();
+	}
+
+	d->connectToPrimary(timeout, SingleApplicationPrivate::NewInstance);
+
+	delete d;
+
+	::exit(EXIT_SUCCESS);
+}
+
+void SingleApplication::addUserData(const QString& userData /*= {}*/)
+{
+	Q_D(SingleApplication);
+	// Add any unique user data
+	if (!userData.isEmpty())
+		d->addAppData(userData);
 }
 
 /**

@@ -27,9 +27,11 @@
 int main(int argc, char *argv[])
 {
     // Allow secondary instances
-    SingleApplication app( argc, argv, true );
+    SingleApplication app( argc, argv);
 
     MessageReceiver msgReceiver;
+
+    app.doSingleInstanceTest(true);
 
     // If this is a secondary instance
     if( app.isSecondary() ) {

@@ -25,7 +25,9 @@
 
 int main(int argc, char *argv[])
 {
-    SingleApplication app( argc, argv );
+    SingleApplication app( argc, argv);
+
+    app.doSingleInstanceTest(false, SingleApplication::User, 2000, app.arguments().join(' ').toUtf8());
 
     qWarning() << "Started a new instance";
 

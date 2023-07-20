@@ -100,8 +100,14 @@ public:
      * Usually 4*timeout would be the worst case (fail) scenario.
      * @see See the corresponding `QAPPLICATION_CLASS` constructor for reference
      */
-    explicit SingleApplication( int &argc, char *argv[], bool allowSecondary = false, Options options = Mode::User, int timeout = 1000, const QString &userData = {} );
+    explicit SingleApplication( int &argc, char *argv[]);
     ~SingleApplication() override;
+
+    void doSingleInstanceTest(bool allowSecondary = false, Options options = Mode::User, int timeout = 1000, const QString& userData = {});
+
+
+    void addUserData(const QString& userData = {});
+
 
     /**
      * @brief Checks if the instance is primary instance
