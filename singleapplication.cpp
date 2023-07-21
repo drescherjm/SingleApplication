@@ -63,6 +63,8 @@ void SingleApplication::doSingleInstanceTest(bool allowSecondary, Options option
 	// Store the current mode of the program
 	d->options = options;
 
+	addUserData(userData);
+
 	// Generating an application ID used for identifying the shared memory
 	// block and QLocalServer
 	d->genBlockServerName();
